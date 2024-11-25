@@ -12,3 +12,4 @@ hydra-core
 black
 isort
 pre-commit
+scipy
