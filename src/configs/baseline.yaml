@@ -6,7 +6,7 @@ defaults:
   - dataloader: example
   - transforms: example
   - _self_
-optimizer:
+optimizer: 
   _target_: torch.optim.Adam
   lr: 3e-4
 lr_scheduler:

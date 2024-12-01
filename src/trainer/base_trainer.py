@@ -229,7 +229,10 @@ class BaseTrainer:
                     )
                 )
                 self.writer.add_scalar(
-                    "learning rate", self.lr_scheduler.get_last_lr()[0]
+                    "generator learning rate", self.lr_scheduler.generator_scheduler.get_last_lr()[0]
+                )
+                self.writer.add_scalar(
+                    "discriminator learning rate", self.lr_scheduler.discriminator_scheduler.get_last_lr()[0]
                 )
                 self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)
@@ -373,14 +376,16 @@ class BaseTrainer:
                 )
         return batch
 
-    def _clip_grad_norm(self):
+    def _clip_grad_norm(self, model=None):
         """
         Clips the gradient norm by the value defined in
         config.trainer.max_grad_norm
         """
+        if model is not None:
+            model = self.model
         if self.config["trainer"].get("max_grad_norm", None) is not None:
             clip_grad_norm_(
-                self.model.parameters(), self.config["trainer"]["max_grad_norm"]
+                model.parameters(), self.config["trainer"]["max_grad_norm"]
             )
 
     @torch.no_grad()

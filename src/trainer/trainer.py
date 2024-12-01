@@ -1,11 +1,36 @@
+from pathlib import Path
+
+import pandas as pd
+import torch
+
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
+from src.utils.audio_utils import MelSpectrogram, MelSpectrogramConfig
+from src.logger.utils import plot_spectrogram
 
 
 class Trainer(BaseTrainer):
     """
     Trainer class. Defines the logic of batch logging and processing.
     """
+    def __init__(self, 
+                 model, 
+                 criterion, 
+                 metrics, 
+                 optimizer, 
+                 lr_scheduler, 
+                 config, 
+                 device, 
+                 dataloaders, 
+                 logger, 
+                 writer, 
+                 epoch_len=None, 
+                 skip_oom=True, 
+                 batch_transforms=None):
+        super().__init__(model, criterion, metrics, optimizer, lr_scheduler, config, device, 
+                         dataloaders, logger, writer, epoch_len, skip_oom, batch_transforms)
+        mel_spectrogram_config = MelSpectrogramConfig()
+        self.mel_spectrogram_transformer = MelSpectrogram(mel_spectrogram_config, device=device)
 
     def process_batch(self, batch, metrics: MetricTracker):
         """
@@ -32,20 +57,62 @@ class Trainer(BaseTrainer):
         metric_funcs = self.metrics["inference"]
         if self.is_train:
             metric_funcs = self.metrics["train"]
-            self.optimizer.zero_grad()
 
-        outputs = self.model(**batch)
-        batch.update(outputs)
+        # Discriminator loss
+        if self.is_train:
+            self.optimizer.discriminator_optimizer.zero_grad()
 
-        all_losses = self.criterion(**batch)
-        batch.update(all_losses)
+        generated_audios = self.model.generator(**batch)
+        batch.update({'generated_audios': generated_audios})
+        generated_mpd = self.model.mpd(audio=generated_audios.detach())
+        gt_mpd = self.model.mpd(**batch)
+        generated_msd = self.model.msd(audio=generated_audios.detach())
+        gt_msd = self.model.msd(**batch)
+        batch.update({"probs_generated_mpd": generated_mpd[0]})
+        batch.update({"probs_generated_msd": generated_msd[0]})
+        batch.update({"probs_gt_mpd": gt_mpd[0]})
+        batch.update({"probs_gt_msd": gt_msd[0]})
+        losses_discriminator = self.criterion.discriminator_loss(**batch)
+        batch.update(losses_discriminator)
 
         if self.is_train:
-            batch["loss"].backward()  # sum of all losses is always called loss
-            self._clip_grad_norm()
-            self.optimizer.step()
+            batch["loss_discriminator"].backward()  # sum of all losses is always called loss
+            self._clip_grad_norm(self.model.mpd)
+            self._clip_grad_norm(self.model.msd)
+            self.optimizer.discriminator_optimizer.step()
             if self.lr_scheduler is not None:
-                self.lr_scheduler.step()
+                self.lr_scheduler.discriminator_scheduler.step()
+
+        # Generator loss
+        if self.is_train:
+            self.optimizer.generator_optimizer.zero_grad()
+
+        generated_mels = self.mel_spectrogram_transformer(generated_audios)
+        generated_mpd = self.model.mpd(audio=generated_audios)
+        generated_msd = self.model.msd(audio=generated_audios)
+        gt_mpd = self.model.mpd(**batch)
+        gt_msd = self.model.msd(**batch)
+        batch['spec_generated'] = generated_mels
+        batch.update({"probs_generated_mpd": generated_mpd[0]})
+        batch.update({"probs_generated_msd": generated_msd[0]})
+        batch.update({"probs_gt_mpd": gt_mpd[0]})
+        batch.update({"probs_gt_msd": gt_msd[0]})
+        batch.update({"features_generated_mpd": generated_mpd[1]})
+        batch.update({"features_generated_msd": generated_msd[1]})
+        batch.update({"features_gt_mpd": gt_mpd[1]})
+        batch.update({"features_gt_msd": gt_msd[1]})
+
+        losses_generator = self.criterion.generator_loss(**batch)
+        batch.update(losses_generator)
+
+        if self.is_train:
+            batch["loss_generator"].backward()  # sum of all losses is always called loss
+            self._clip_grad_norm(self.model.generator)
+            self.optimizer.generator_optimizer.step()
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.generator_scheduler.step()
+
+        batch['loss'] = losses_generator['loss_generator'].detach() + losses_discriminator['loss_discriminator'].detach()
 
         # update metrics for each loss (in case of multiple losses)
         for loss_name in self.config.writer.loss_names:
@@ -72,8 +139,138 @@ class Trainer(BaseTrainer):
 
         # logging scheme might be different for different partitions
         if mode == "train":  # the method is called only every self.log_step steps
-            # Log Stuff
-            pass
+            self.log_spectrogram(batch['spec_generated'], name='Generated_Spectrogram')
+            self.log_spectrogram(batch['mel_spec'], name='Ground_truth_Spectrogram')
+            self.log_audio(**batch)
         else:
             # Log Stuff
-            pass
+            # TODO: MOS evaluation via estimator
+            self.log_spectrogram(batch['spec_generated'], name='Generated_Spectrogram')
+            self.log_spectrogram(batch['mel_spec'], name='Ground_truth_Spectrogram')
+            self.log_audio(**batch)
+
+    def log_audio(self, audio_path, examples_to_log=10, **batch):
+        gt_audios = batch['audio']
+        predicted_audios = batch['generated_audios']
+        tuples = list(zip(audio_path, gt_audios, predicted_audios))
+        rows = {}
+        for path, gt_audio, predicted_audio in tuples[:examples_to_log]:
+            rows[Path(path).name] = {
+                "estimated": self.writer.add_audio("estimated", predicted_audio, MelSpectrogramConfig.sr),
+                "target": self.writer.add_audio("target", gt_audio, MelSpectrogramConfig.sr),
+            }
+            self.writer.add_table(
+                "predictions", pd.DataFrame.from_dict(rows, orient="index")
+            )
+
+    def log_spectrogram(self, spectrogram, name='spectrogram', **batch):
+        spectrogram_for_plot = spectrogram[0].detach().cpu()
+        image = plot_spectrogram(spectrogram_for_plot)
+        self.writer.add_image(name, image)
+
+    def _save_checkpoint(self, epoch, save_best=False, only_best=False):
+        """
+        Save the checkpoints.
+
+        Args:
+            epoch (int): current epoch number.
+            save_best (bool): if True, rename the saved checkpoint to 'model_best.pth'.
+            only_best (bool): if True and the checkpoint is the best, save it only as
+                'model_best.pth'(do not duplicate the checkpoint as
+                checkpoint-epochEpochNumber.pth)
+        """
+        arch = type(self.model).__name__
+        state = {
+            "arch": arch,
+            "epoch": epoch,
+            "state_dict": self.model.state_dict(),
+            "generator_optimizer": self.optimizer.generator_optimizer.state_dict(),
+            "discriminator_optimizer": self.optimizer.discriminator_optimizer.state_dict(),
+            "generator_scheduler": self.lr_scheduler.generator_scheduler.state_dict(),
+            "discriminator_scheduler": self.lr_scheduler.discriminator_scheduler.state_dict(),
+            "monitor_best": self.mnt_best,
+            "config": self.config,
+        }
+        filename = str(self.checkpoint_dir / f"checkpoint-epoch{epoch}.pth")
+        if not (only_best and save_best):
+            torch.save(state, filename)
+            if self.config.writer.log_checkpoints:
+                self.writer.add_checkpoint(filename, str(self.checkpoint_dir.parent))
+            self.logger.info(f"Saving checkpoint: {filename} ...")
+        if save_best:
+            best_path = str(self.checkpoint_dir / "model_best.pth")
+            torch.save(state, best_path)
+            if self.config.writer.log_checkpoints:
+                self.writer.add_checkpoint(best_path, str(self.checkpoint_dir.parent))
+            self.logger.info("Saving current best: model_best.pth ...")
+
+    def _resume_checkpoint(self, resume_path):
+        """
+        Resume from a saved checkpoint (in case of server crash, etc.).
+        The function loads state dicts for everything, including model,
+        optimizers, etc.
+
+        Notice that the checkpoint should be located in the current experiment
+        saved directory (where all checkpoints are saved in '_save_checkpoint').
+
+        Args:
+            resume_path (str): Path to the checkpoint to be resumed.
+        """
+        resume_path = str(resume_path)
+        self.logger.info(f"Loading checkpoint: {resume_path} ...")
+        checkpoint = torch.load(resume_path, self.device)
+        self.start_epoch = checkpoint["epoch"] + 1
+        self.mnt_best = checkpoint["monitor_best"]
+
+        # load architecture params from checkpoint.
+        if checkpoint["config"]["model"] != self.config["model"]:
+            self.logger.warning(
+                "Warning: Architecture configuration given in the config file is different from that "
+                "of the checkpoint. This may yield an exception when state_dict is loaded."
+            )
+        self.model.load_state_dict(checkpoint["state_dict"])
+
+        # load optimizer state from checkpoint only when optimizer type is not changed.
+        if (
+            checkpoint["config"]["generator_optimizer"] != self.config["generator_optimizer"]
+            or checkpoint["config"]["discriminator_optimizer"] != self.config["discriminator_optimizer"]
+            or checkpoint["config"]["generator_lr_scheduler"] != self.config["generator_lr_scheduler"]
+            or checkpoint["config"]["discriminator_lr_scheduler"] != self.config["discriminator_lr_scheduler"]
+        ):
+            self.logger.warning(
+                "Warning: Optimizer or lr_scheduler given in the config file is different "
+                "from that of the checkpoint. Optimizer and scheduler parameters "
+                "are not resumed."
+            )
+        else:
+            self.optimizer.generator_optimizer.load_state_dict(checkpoint["generator_optimizer"])
+            self.optimizer.discriminator_optimizer.load_state_dict(checkpoint["discriminator_optimizer"])
+            self.lr_scheduler.generator_scheduler.load_state_dict(checkpoint["generator_scheduler"])
+            self.lr_scheduler.discriminator_scheduler.load_state_dict(checkpoint["discriminator_scheduler"])
+
+        self.logger.info(
+            f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"
+        )
+
+    def _from_pretrained(self, pretrained_path):
+        """
+        Init model with weights from pretrained pth file.
+
+        Notice that 'pretrained_path' can be any path on the disk. It is not
+        necessary to locate it in the experiment saved dir. The function
+        initializes only the model.
+
+        Args:
+            pretrained_path (str): path to the model state dict.
+        """
+        pretrained_path = str(pretrained_path)
+        if hasattr(self, "logger"):  # to support both trainer and inferencer
+            self.logger.info(f"Loading model weights from: {pretrained_path} ...")
+        else:
+            print(f"Loading model weights from: {pretrained_path} ...")
+        checkpoint = torch.load(pretrained_path, self.device)
+
+        if checkpoint.get("state_dict") is not None:
+            self.model.load_state_dict(checkpoint["state_dict"])
+        else:
+            self.model.load_state_dict(checkpoint)

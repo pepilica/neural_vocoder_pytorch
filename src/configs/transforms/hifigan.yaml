@@ -1,0 +1,10 @@
+defaults:
+  - _self_
+
+instance_transforms:
+  train: null
+  inference: null
+
+batch_transforms:
+  train: null
+  inference: null

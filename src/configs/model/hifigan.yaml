@@ -1,0 +1,17 @@
+_target_: src.model.HiFiGAN
+generator_params:
+  kernels_mrf: [3, 5, 7] 
+  kernels_upsample: [16, 16, 8] 
+  dilations: [[[1], [2]], [[2], [6]], [[3], [12]]]
+  encoder_channels: 256
+mpd_params:
+  periods: [2, 3, 5, 7, 11]
+  block_kernel: [5, 1]
+  block_stride: [3, 1]
+  channels: [32, 128, 512, 1024]
+msd_params:
+  pooling_factors: [1, 2, 4]
+  kernels: [15, 41, 41, 41, 41, 41, 5]
+  strides: [1, 2, 2, 4, 4, 1, 1]
+  groups: [1, 4, 16, 16, 16, 16, 1]
+  channels: [128, 128, 256, 512, 1024, 1024, 1024]
