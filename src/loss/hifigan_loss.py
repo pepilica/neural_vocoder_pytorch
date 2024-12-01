@@ -63,8 +63,8 @@ class HiFiGANLoss(nn.Module):
         mpd_loss = self.gan_loss_mpd(probs_gt_mpd, probs_generated_mpd)
         msd_loss = self.gan_loss_msd(probs_gt_msd, probs_generated_msd)
         return {'loss_discriminator': mpd_loss + msd_loss, 
-                'mpd_loss': mpd_loss, 
-                'msd_loss': msd_loss}
+                'mpd_loss': mpd_loss.detach().cpu(), 
+                'msd_loss': msd_loss.detach().cpu()}
 
     def generator_loss(self,
                           probs_generated_mpd, probs_generated_msd, 
@@ -82,10 +82,10 @@ class HiFiGANLoss(nn.Module):
         fm_loss_term = self.lambda_fm * (feature_matching_loss_mpd + feature_matching_loss_msd)
         total_loss = generator_loss_term + mel_spec_loss_term + fm_loss_term
         return {"loss_generator": total_loss,
-                'generator_loss_mpd': gan_loss_generator_mpd,
-                'generator_loss_msd': gan_loss_generator_msd,
-                'mel_spec_loss': mel_spec_loss,
-                'feature_matching_loss_mpd': feature_matching_loss_mpd,
-                'feature_matching_loss_msd': feature_matching_loss_msd,
-                'gan_loss_generator': gan_loss_generator_mpd + gan_loss_generator_msd,
-                "feature_matching_loss": feature_matching_loss_mpd + feature_matching_loss_msd}
+                'generator_loss_mpd': gan_loss_generator_mpd.detach().cpu(),
+                'generator_loss_msd': gan_loss_generator_msd.detach().cpu(),
+                'mel_spec_loss': mel_spec_loss.detach().cpu(),
+                'feature_matching_loss_mpd': feature_matching_loss_mpd.detach().cpu(),
+                'feature_matching_loss_msd': feature_matching_loss_msd.detach().cpu(),
+                'gan_loss_generator': (gan_loss_generator_mpd + gan_loss_generator_msd).detach().cpu(),
+                "feature_matching_loss": (feature_matching_loss_mpd + feature_matching_loss_msd).detach().cpu()}

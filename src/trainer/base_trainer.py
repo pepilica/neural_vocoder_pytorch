@@ -30,6 +30,7 @@ class BaseTrainer:
         epoch_len=None,
         skip_oom=True,
         batch_transforms=None,
+        use_speedup=False
     ):
         """
         Args:
@@ -142,6 +143,10 @@ class BaseTrainer:
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
 
+        if use_speedup:
+            torch.backends.cudnn.deterministic = False
+            torch.backends.cudnn.benchmark = True 
+
     def train(self):
         """
         Wrapper around training process to save model on keyboard interrupt.
@@ -229,10 +234,10 @@ class BaseTrainer:
                     )
                 )
                 self.writer.add_scalar(
-                    "generator learning rate", self.lr_scheduler.generator_scheduler.get_last_lr()[0]
+                    "generator_learning_rate", self.lr_scheduler.generator_scheduler.get_last_lr()[0]
                 )
                 self.writer.add_scalar(
-                    "discriminator learning rate", self.lr_scheduler.discriminator_scheduler.get_last_lr()[0]
+                    "discriminator_learning_rate", self.lr_scheduler.discriminator_scheduler.get_last_lr()[0]
                 )
                 self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)

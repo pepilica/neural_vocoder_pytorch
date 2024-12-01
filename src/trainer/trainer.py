@@ -112,11 +112,11 @@ class Trainer(BaseTrainer):
             if self.lr_scheduler is not None:
                 self.lr_scheduler.generator_scheduler.step()
 
-        batch['loss'] = losses_generator['loss_generator'].detach() + losses_discriminator['loss_discriminator'].detach()
+        batch['loss'] = losses_generator['loss_generator'] + losses_discriminator['loss_discriminator']
 
         # update metrics for each loss (in case of multiple losses)
         for loss_name in self.config.writer.loss_names:
-            metrics.update(loss_name, batch[loss_name].item())
+            metrics.update(loss_name, batch[loss_name].detach().cpu().item())
 
         for met in metric_funcs:
             metrics.update(met.name, met(**batch))
@@ -156,8 +156,8 @@ class Trainer(BaseTrainer):
         rows = {}
         for path, gt_audio, predicted_audio in tuples[:examples_to_log]:
             rows[Path(path).name] = {
-                "estimated": self.writer.add_audio("estimated", predicted_audio, MelSpectrogramConfig.sr),
-                "target": self.writer.add_audio("target", gt_audio, MelSpectrogramConfig.sr),
+                "estimated": self.writer.add_audio("estimated", predicted_audio.detach().cpu(), MelSpectrogramConfig.sr),
+                "target": self.writer.add_audio("target", gt_audio.detach().cpu(), MelSpectrogramConfig.sr),
             }
             self.writer.add_table(
                 "predictions", pd.DataFrame.from_dict(rows, orient="index")
