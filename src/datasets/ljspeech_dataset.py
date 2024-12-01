@@ -19,12 +19,12 @@ class LJSpeechDataset:
         self.wav_max_len = audio_max_len
 
     def __getitem__(self, index):
-        audio_i = torchaudio.load(self.paths[index])[0]
+        audio_i = torchaudio.load(str(self.paths[index]))[0]
         if self.wav_max_len is not None:
             if self.random:
                 start_pos = random.randint(0, audio_i.shape[-1] - self.wav_max_len)
             else:
-                start_pos = 5000
+                start_pos = 0
             audio_i = audio_i[:, start_pos: start_pos + self.wav_max_len]
         mel_spec_i = self.mel_spectrogram_transformer(audio_i.detach())
         if len(audio_i.shape) > 1:

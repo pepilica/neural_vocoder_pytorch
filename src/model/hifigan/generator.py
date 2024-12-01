@@ -14,8 +14,7 @@ class ResBlock(nn.Module):
                     nn.LeakyReLU(negative_slope=relu_slope),
                     WNormConv1d(channels, channels, kernel, dilation=dilations[j][i], padding="same")
                 ) for i in range(len(dilations[0]))])
-            for j in range(len(dilations)
-            )
+            for j in range(len(dilations))
         ])
 
     def forward(self, x):
@@ -57,7 +56,7 @@ class Generator(nn.Module):
                 MultiReceptiveFieldFusion(dilations, kernels_mrf, cur_num_channels // 2, relu_slope)
             ))
             cur_num_channels //= 2
-        self.upsampling_layers = nn.ModuleList(upsampling_layers)
+        self.upsampling_layers = nn.Sequential(*upsampling_layers)
         self.audio_head = nn.Sequential(
             nn.LeakyReLU(relu_slope),
             WNormConv1d(cur_num_channels, 1, kernel_head, padding='same'),
@@ -66,8 +65,6 @@ class Generator(nn.Module):
 
     def forward(self, mel_spec, **batch):
         spec_encoded = self.encoder(mel_spec)
-        spec_upsampled = spec_encoded
-        for layer in self.upsampling_layers:
-            spec_upsampled = layer(spec_upsampled)
-        generated_audio = self.audio_head(spec_upsampled).flatten(1, 2)[:, :batch['audio'].shape[-1]]
+        spec_upsampled = self.upsampling_layers(spec_encoded)
+        generated_audio = self.audio_head(spec_upsampled).flatten(1, 2)
         return generated_audio

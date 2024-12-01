@@ -20,12 +20,10 @@ class WNormConv1d(nn.Module):
 
 class WNormConvTranspose1d(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int | Tuple[int], 
-                 stride: int | Tuple[int] = 1, padding: str | int | Tuple[int] = 0, 
-                 dilation: int | Tuple[int] = 1, groups: int = 1, bias: bool = True, device=None, dtype=None) -> None:
+                 stride: int | Tuple[int] = 1, padding: str | int | Tuple[int] = 0) -> None:
         super().__init__()
         self.layer = nn.utils.weight_norm(
-            nn.ConvTranspose1d(in_channels, out_channels, kernel_size, stride, padding, 
-                               dilation, groups, bias, device=device, dtype=dtype)
+            nn.ConvTranspose1d(in_channels, out_channels, kernel_size, stride, padding)
         )
     
     def forward(self, x):
