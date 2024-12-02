@@ -31,6 +31,13 @@ class Trainer(BaseTrainer):
                          dataloaders, logger, writer, epoch_len, skip_oom, batch_transforms)
         mel_spectrogram_config = MelSpectrogramConfig()
         self.mel_spectrogram_transformer = MelSpectrogram(mel_spectrogram_config, device=device)
+        self.first_batch_generator = False
+        self.first_batch_discriminator = False
+
+    def _evaluation_epoch(self, epoch, part, dataloader):
+        self.first_batch_generator = True
+        self.first_batch_discriminator = True
+        return super()._evaluation_epoch(epoch, part, dataloader)
 
     def process_batch(self, batch, metrics: MetricTracker):
         """
@@ -80,8 +87,10 @@ class Trainer(BaseTrainer):
             self._clip_grad_norm(self.model.mpd)
             self._clip_grad_norm(self.model.msd)
             self.optimizer.discriminator_optimizer.step()
+        elif self.first_batch_discriminator:
             if self.lr_scheduler is not None:
                 self.lr_scheduler.discriminator_scheduler.step()
+                self.first_batch = False
 
         # Generator loss
         if self.is_train:
@@ -109,8 +118,10 @@ class Trainer(BaseTrainer):
             batch["loss_generator"].backward()  # sum of all losses is always called loss
             self._clip_grad_norm(self.model.generator)
             self.optimizer.generator_optimizer.step()
+        elif self.first_batch_generator:
             if self.lr_scheduler is not None:
                 self.lr_scheduler.generator_scheduler.step()
+                self.first_batch = False
 
         batch['loss'] = losses_generator['loss_generator'] + losses_discriminator['loss_discriminator']
 

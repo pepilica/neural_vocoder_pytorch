@@ -68,3 +68,17 @@ class Generator(nn.Module):
         spec_upsampled = self.upsampling_layers(spec_encoded)
         generated_audio = self.audio_head(spec_upsampled).flatten(1, 2)
         return generated_audio
+    
+    def __str__(self) -> str:
+        """
+        Model prints with the number of parameters.
+        """
+        all_parameters = sum([p.numel() for p in self.parameters()])
+        trainable_parameters = sum(
+            [p.numel() for p in self.parameters() if p.requires_grad]
+        )
+
+        result_info = f"All parameters: {all_parameters}"
+        result_info = result_info + f"\nTrainable parameters: {trainable_parameters}"
+
+        return result_info
