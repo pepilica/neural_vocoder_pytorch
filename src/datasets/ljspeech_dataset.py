@@ -15,7 +15,7 @@ class LJSpeechDataset:
             self.paths = self.paths[:limit]
         self.random = random
         mel_spectrogram_config = MelSpectrogramConfig()
-        self.mel_spectrogram_transformer = MelSpectrogram(mel_spectrogram_config, device)
+        self.mel_spectrogram_transformer = MelSpectrogram(mel_spectrogram_config).to(device)
         self.wav_max_len = audio_max_len
 
     def __getitem__(self, index):
@@ -25,7 +25,7 @@ class LJSpeechDataset:
                 start_pos = random.randint(0, audio_i.shape[-1] - self.wav_max_len)
             else:
                 start_pos = 0
-            audio_i = audio_i[:, start_pos: start_pos + self.wav_max_len]
+            audio_i = audio_i[:, start_pos:start_pos + self.wav_max_len]
         mel_spec_i = self.mel_spectrogram_transformer(audio_i.detach())
         if len(audio_i.shape) > 1:
             audio_i = audio_i.mean(dim=0)

@@ -8,14 +8,18 @@ from src.utils.audio_utils import MelSpectrogramConfig
 class ResBlock(nn.Module):
     def __init__(self, dilations, kernel, channels, relu_slope=0.1) -> None:
         super().__init__()
-        self.layers = nn.ModuleList([
-            nn.Sequential(*[
-                nn.Sequential(
+        self.layers = nn.ModuleList()
+        for i in range(len(dilations)):
+            layer_i = []
+            for j in range(len(dilations[0])):
+                layer_i.extend([
                     nn.LeakyReLU(negative_slope=relu_slope),
-                    WNormConv1d(channels, channels, kernel, dilation=dilations[j][i], padding="same")
-                ) for i in range(len(dilations[0]))])
-            for j in range(len(dilations))
-        ])
+                    WNormConv1d(channels, channels, kernel, dilation=dilations[i][j], padding="same")
+                ])
+            self.layers.append(
+                nn.Sequential(*layer_i)
+            )
+
 
     def forward(self, x):
         cur_x = x
@@ -36,7 +40,7 @@ class MultiReceptiveFieldFusion(nn.Module):
         for block_i in self.layers:
             output_i = block_i(x)
             result = result + output_i if result is not None else output_i
-        return result
+        return result / len(self.layers)
 
 
 class Generator(nn.Module):
@@ -56,7 +60,7 @@ class Generator(nn.Module):
                 MultiReceptiveFieldFusion(dilations, kernels_mrf, cur_num_channels // 2, relu_slope)
             ))
             cur_num_channels //= 2
-        self.upsampling_layers = nn.Sequential(*upsampling_layers)
+        self.upsampling_layers = nn.ModuleList(upsampling_layers)
         self.audio_head = nn.Sequential(
             nn.LeakyReLU(relu_slope),
             WNormConv1d(cur_num_channels, 1, kernel_head, padding='same'),
@@ -65,7 +69,9 @@ class Generator(nn.Module):
 
     def forward(self, mel_spec, **batch):
         spec_encoded = self.encoder(mel_spec)
-        spec_upsampled = self.upsampling_layers(spec_encoded)
+        spec_upsampled = spec_encoded
+        for layer in self.upsampling_layers:
+            spec_upsampled = layer(spec_upsampled)
         generated_audio = self.audio_head(spec_upsampled).flatten(1, 2)
         return generated_audio
     

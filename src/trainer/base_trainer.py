@@ -226,6 +226,7 @@ class BaseTrainer:
             self.train_metrics.update("grad_norm", self._get_grad_norm())
 
             # log current results
+            print(self.log_step)
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
                 self.logger.debug(
@@ -245,6 +246,7 @@ class BaseTrainer:
                 # because we are interested in recent train metrics
                 last_train_metrics = self.train_metrics.result()
                 self.train_metrics.reset()
+                torch.cuda.empty_cache()
             if batch_idx + 1 >= self.epoch_len:
                 break
 

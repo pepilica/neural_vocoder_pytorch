@@ -13,8 +13,13 @@ class MSDDiscriminator(nn.Module):
             self.pooling = nn.Identity()
             conv_type = SNormConv1d
         else:
+            pooling = []
+            cur_factor = pooling_factor
+            while cur_factor > 1:
+                pooling.append(nn.AvgPool1d(kernel_size=4, stride=2, padding=2))
+                cur_factor //= 2
             self.pooling = nn.Sequential(
-                *[nn.AvgPool1d(kernel_size=4, stride=2, padding=2) for _ in range(int(math.log2(pooling_factor)))]
+                *pooling
             )
             conv_type = WNormConv1d
         channels = [1] + channels

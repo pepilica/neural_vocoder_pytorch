@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
+from torch.profiler import profile, record_function, ProfilerActivity
 
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
@@ -30,7 +31,7 @@ class Trainer(BaseTrainer):
         super().__init__(model, criterion, metrics, optimizer, lr_scheduler, config, device, 
                          dataloaders, logger, writer, epoch_len, skip_oom, batch_transforms)
         mel_spectrogram_config = MelSpectrogramConfig()
-        self.mel_spectrogram_transformer = MelSpectrogram(mel_spectrogram_config, device=device)
+        self.mel_spectrogram_transformer = MelSpectrogram(mel_spectrogram_config).to(device)
         self.first_batch_generator = False
         self.first_batch_discriminator = False
 
@@ -60,6 +61,8 @@ class Trainer(BaseTrainer):
         """
         batch = self.move_batch_to_device(batch)
         batch = self.transform_batch(batch)  # transform batch on device -- faster
+        gpu_info = torch.cuda.mem_get_info()
+        print('batch start:', gpu_info[0] / gpu_info[1])
 
         metric_funcs = self.metrics["inference"]
         if self.is_train:
@@ -68,18 +71,18 @@ class Trainer(BaseTrainer):
         # Discriminator loss
         if self.is_train:
             self.optimizer.discriminator_optimizer.zero_grad()
-
+            self.optimizer.generator_optimizer.zero_grad()
+            self.model.mpd.train()
+            self.model.msd.train()
+    
         generated_audios = self.model.generator(**batch)
         batch.update({'generated_audios': generated_audios})
-        generated_mpd = self.model.mpd(audio=generated_audios.detach())
-        gt_mpd = self.model.mpd(**batch)
-        generated_msd = self.model.msd(audio=generated_audios.detach())
-        gt_msd = self.model.msd(**batch)
-        batch.update({"probs_generated_mpd": generated_mpd[0]})
-        batch.update({"probs_generated_msd": generated_msd[0]})
-        batch.update({"probs_gt_mpd": gt_mpd[0]})
-        batch.update({"probs_gt_msd": gt_msd[0]})
-        losses_discriminator = self.criterion.discriminator_loss(**batch)
+        generated_mpd, _ = self.model.mpd(audio=generated_audios.detach())
+        gt_mpd, _ = self.model.mpd(**batch)
+        generated_msd, _ = self.model.msd(audio=generated_audios.detach())
+        gt_msd, _ = self.model.msd(**batch)
+        losses_discriminator = self.criterion.discriminator_loss(gt_mpd, gt_msd, 
+                                                                 generated_mpd, generated_msd)
         batch.update(losses_discriminator)
 
         if self.is_train:
@@ -91,27 +94,32 @@ class Trainer(BaseTrainer):
             if self.lr_scheduler is not None:
                 self.lr_scheduler.discriminator_scheduler.step()
                 self.first_batch = False
+        
+        gpu_info = torch.cuda.mem_get_info()
+        print('batch end:', gpu_info[0] / gpu_info[1])
 
         # Generator loss
         if self.is_train:
             self.optimizer.generator_optimizer.zero_grad()
-
+            self.model.mpd.eval()
+            self.model.msd.eval()
+        
         generated_mels = self.mel_spectrogram_transformer(generated_audios)
+        batch['spec_generated'] = generated_mels.detach()
         generated_mpd = self.model.mpd(audio=generated_audios)
         generated_msd = self.model.msd(audio=generated_audios)
         gt_mpd = self.model.mpd(**batch)
         gt_msd = self.model.msd(**batch)
-        batch['spec_generated'] = generated_mels
-        batch.update({"probs_generated_mpd": generated_mpd[0]})
-        batch.update({"probs_generated_msd": generated_msd[0]})
-        batch.update({"probs_gt_mpd": gt_mpd[0]})
-        batch.update({"probs_gt_msd": gt_msd[0]})
-        batch.update({"features_generated_mpd": generated_mpd[1]})
-        batch.update({"features_generated_msd": generated_msd[1]})
-        batch.update({"features_gt_mpd": gt_mpd[1]})
-        batch.update({"features_gt_msd": gt_msd[1]})
 
-        losses_generator = self.criterion.generator_loss(**batch)
+        losses_generator = self.criterion.generator_loss(spec_generated=generated_mels,
+                                                         probs_generated_mpd=generated_mpd[0],
+                                                         probs_generated_msd=generated_msd[0],
+                                                         features_generated_mpd=generated_mpd[1],
+                                                         features_generated_msd=generated_msd[1],
+                                                         features_gt_mpd=gt_mpd[1],
+                                                         features_gt_msd=gt_msd[1],
+                                                         mel_spec=batch['mel_spec'])
+        
         batch.update(losses_generator)
 
         if self.is_train:
@@ -123,11 +131,18 @@ class Trainer(BaseTrainer):
                 self.lr_scheduler.generator_scheduler.step()
                 self.first_batch = False
 
-        batch['loss'] = losses_generator['loss_generator'] + losses_discriminator['loss_discriminator']
+        batch['loss'] = (losses_generator['loss_generator'] + losses_discriminator['loss_discriminator']).detach()
 
         # update metrics for each loss (in case of multiple losses)
+
+        for k, v in batch.items():
+            if isinstance(v, list):
+                batch[k] = [i.detach().cpu() if isinstance(i, torch.Tensor) else i for i in v]
+            else:
+                batch[k] = v.detach().cpu()
+
         for loss_name in self.config.writer.loss_names:
-            metrics.update(loss_name, batch[loss_name].detach().cpu().item())
+            metrics.update(loss_name, batch[loss_name].item())
 
         for met in metric_funcs:
             metrics.update(met.name, met(**batch))

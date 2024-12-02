@@ -6,7 +6,7 @@ from src.model.hifigan.layers import WNormConv2d
 class MPDDiscriminator(nn.Module):
     def __init__(self, period, channels, final_channels=1024, block_kernel=(5, 1), 
                  block_stride=(3, 1), b4_last_kernel=(5, 1), b4_last_padding=(2, 0), 
-                 last_kernel=(5, 1), last_padding=(2, 0), relu_scope=0.1) -> None:
+                 last_kernel=(3, 1), last_padding=(1, 0), relu_scope=0.1) -> None:
         super().__init__()
         self.period = period
         channels = [1] + channels
@@ -29,10 +29,11 @@ class MPDDiscriminator(nn.Module):
                       padding=b4_last_padding),
             nn.LeakyReLU(relu_scope)
         ))
-        self.last_layer = nn.Conv2d(
+        self.last_layer = WNormConv2d(
             final_channels,
             1,
             last_kernel,
+            1,
             padding=last_padding,
         )
 
@@ -41,13 +42,12 @@ class MPDDiscriminator(nn.Module):
             x = F.pad(x, (0, self.period - s), mode="reflect")
         B, S = x.shape
         x = x.reshape((B, 1, self.period, S // self.period)).contiguous()
-
         feature_maps = []
         for layer in self.blocks:
             x = layer(x)
             feature_maps.append(x)
         x = self.last_layer(x)
-        return x.flatten(-1, -1), feature_maps
+        return x.flatten(1, -1), feature_maps
 
 
 class MPD(nn.Module):
