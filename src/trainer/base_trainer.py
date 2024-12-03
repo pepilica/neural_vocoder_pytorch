@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import gc
 
 import torch
 from numpy import inf
@@ -215,6 +216,8 @@ class BaseTrainer:
                     batch,
                     metrics=self.train_metrics,
                 )
+                gc.collect()
+                torch.cuda.empty_cache()
             except torch.cuda.OutOfMemoryError as e:
                 if self.skip_oom:
                     self.logger.warning("OOM on batch. Skipping batch.")
@@ -222,7 +225,6 @@ class BaseTrainer:
                     continue
                 else:
                     raise e
-
             self.train_metrics.update("grad_norm", self._get_grad_norm())
 
             # log current results

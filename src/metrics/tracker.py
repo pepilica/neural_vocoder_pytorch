@@ -50,7 +50,7 @@ class MetricTracker:
         Returns:
             average_value (float): average value for the metric.
         """
-        return self._data.average[key]
+        return self._data.at[key, "average"]
 
     def result(self):
         """

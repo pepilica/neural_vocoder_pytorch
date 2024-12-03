@@ -64,22 +64,17 @@ class Trainer(BaseTrainer):
         metric_funcs = self.metrics["inference"]
         if self.is_train:
             metric_funcs = self.metrics["train"]
-
-        # Discriminator loss
-        if self.is_train:
-            self.optimizer.discriminator_optimizer.zero_grad()
+            self.model.mpd.train()
+            self.model.msd.train()
 
         generated_audios = self.model.generator(**batch)
         batch.update({'generated_audios': generated_audios})
-        generated_mpd = self.model.mpd(audio=generated_audios.detach())
-        gt_mpd = self.model.mpd(**batch)
-        generated_msd = self.model.msd(audio=generated_audios.detach())
-        gt_msd = self.model.msd(**batch)
-        batch.update({"probs_generated_mpd": generated_mpd[0]})
-        batch.update({"probs_generated_msd": generated_msd[0]})
-        batch.update({"probs_gt_mpd": gt_mpd[0]})
-        batch.update({"probs_gt_msd": gt_msd[0]})
-        losses_discriminator = self.criterion.discriminator_loss(**batch)
+        generated_mpd, _ = self.model.mpd(audio=generated_audios.detach())
+        gt_mpd, _ = self.model.mpd(**batch)
+        generated_msd, _ = self.model.msd(audio=generated_audios.detach())
+        gt_msd, _ = self.model.msd(**batch)
+        losses_discriminator = self.criterion.discriminator_loss(gt_mpd, gt_msd, 
+                                                                 generated_mpd, generated_msd)
         batch.update(losses_discriminator)
 
         if self.is_train:
@@ -95,23 +90,24 @@ class Trainer(BaseTrainer):
         # Generator loss
         if self.is_train:
             self.optimizer.generator_optimizer.zero_grad()
-
+            self.model.mpd.eval()
+            self.model.msd.eval()
+        
         generated_mels = self.mel_spectrogram_transformer(generated_audios)
+        batch['spec_generated'] = generated_mels.detach()
         generated_mpd = self.model.mpd(audio=generated_audios)
         generated_msd = self.model.msd(audio=generated_audios)
         gt_mpd = self.model.mpd(**batch)
         gt_msd = self.model.msd(**batch)
-        batch['spec_generated'] = generated_mels
-        batch.update({"probs_generated_mpd": generated_mpd[0]})
-        batch.update({"probs_generated_msd": generated_msd[0]})
-        batch.update({"probs_gt_mpd": gt_mpd[0]})
-        batch.update({"probs_gt_msd": gt_msd[0]})
-        batch.update({"features_generated_mpd": generated_mpd[1]})
-        batch.update({"features_generated_msd": generated_msd[1]})
-        batch.update({"features_gt_mpd": gt_mpd[1]})
-        batch.update({"features_gt_msd": gt_msd[1]})
 
-        losses_generator = self.criterion.generator_loss(**batch)
+        losses_generator = self.criterion.generator_loss(spec_generated=generated_mels,
+                                                         probs_generated_mpd=generated_mpd[0],
+                                                         probs_generated_msd=generated_msd[0],
+                                                         features_generated_mpd=generated_mpd[1],
+                                                         features_generated_msd=generated_msd[1],
+                                                         features_gt_mpd=gt_mpd[1],
+                                                         features_gt_msd=gt_msd[1],
+                                                         mel_spec=batch['mel_spec'])
         batch.update(losses_generator)
 
         if self.is_train:
@@ -123,7 +119,9 @@ class Trainer(BaseTrainer):
                 self.lr_scheduler.generator_scheduler.step()
                 self.first_batch = False
 
-        batch['loss'] = losses_generator['loss_generator'] + losses_discriminator['loss_discriminator']
+        batch['loss'] = (losses_generator['loss_generator'] + losses_discriminator['loss_discriminator']).detach()
+        batch['loss_discriminator'] = batch['loss_discriminator'].detach()
+        batch['loss_generator'] = batch['loss_discriminator'].detach()
 
         # update metrics for each loss (in case of multiple losses)
         for loss_name in self.config.writer.loss_names:
