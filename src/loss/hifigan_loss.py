@@ -33,7 +33,7 @@ class MelSpectrogramLoss(nn.Module):
         super().__init__()
 
     def forward(self, spec_gt, spec_generated, **kwargs):
-        return l1_loss(spec_gt, spec_generated)
+        return l1_loss(spec_generated, spec_gt)
     
 
 class FeatureMatchingLoss(nn.Module):

@@ -1,0 +1,2 @@
+test:
+  _target_: src.datasets.CustomDirDataset

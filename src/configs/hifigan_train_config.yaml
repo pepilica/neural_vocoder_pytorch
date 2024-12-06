@@ -8,20 +8,20 @@ defaults:
   - _self_
 generator_optimizer: 
   _target_: torch.optim.AdamW
-  lr: 0.00007  # OG lr divided by /sqrt{4} because of adamw scaling laws
+  lr: 0.0002  # OG lr divided by /sqrt{4} because of adamw scaling laws
   betas: [0.8, 0.99]
 discriminator_optimizer: 
   _target_: torch.optim.AdamW
-  lr: 0.00007  # OG lr divided by /sqrt{4} because of adamw scaling laws
+  lr: 0.0002  # OG lr divided by /sqrt{4} because of adamw scaling laws
   betas: [0.8, 0.99]
 optimizer:
   _target_: src.model.hifigan.gan_optimizers.GANOptimizer
 generator_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.999
+  gamma: 0.99
 discriminator_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.999
+  gamma: 0.99
 lr_scheduler:
   _target_: src.model.hifigan.gan_optimizers.GANLRScheduler
 loss_function:
@@ -30,9 +30,9 @@ trainer:
   log_step: 50
   n_epochs: 100
   # epoch_len: 400
-  epoch_len: 250
+  epoch_len: 1000
   device_tensors: ["audio", "mel_spec"] # which tensors should be on device (ex. GPU)
-  # resume_from: /home/pepilica/neural_vocoder_pytorch/weights/checkpoint-epoch19.pth # null or path to the checkpoint dir with *.pth and config.yaml
+  resume_from: /home/pepilica/neural_vocoder_pytorch/weights/random_bs32_len16k_epoch4_clip100_mrfsum.pth # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
   override: True # if True, will override the previous run with the same name
   monitor: "min val_loss" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
@@ -40,6 +40,6 @@ trainer:
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   # from_pretrained: /home/pepilica/neural_vocoder_pytorch/weights/checkpoint-epoch100.pth
-  max_grad_norm: 1000
+  max_grad_norm: 100
   use_speedup: True
   seed: 1

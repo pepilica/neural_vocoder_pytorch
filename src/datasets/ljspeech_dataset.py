@@ -6,7 +6,7 @@ from src.utils.audio_utils import MelSpectrogramConfig, MelSpectrogram
 
 
 class LJSpeechDataset:
-    def __init__(self, data_dir, audio_max_len=None, limit=None, random=False, device='cpu', **kwargs):
+    def __init__(self, data_dir, audio_max_len=None, limit=None, random=True, device='cpu', **kwargs):
         data_dir_path = Path(data_dir)
         self.paths = []
         for wav_i in data_dir_path.iterdir():
@@ -21,7 +21,7 @@ class LJSpeechDataset:
     def __getitem__(self, index):
         audio_i = torchaudio.load(str(self.paths[index]))[0]
         if self.wav_max_len is not None:
-            if self.random:
+            if self.random and audio_i.shape[-1] - self.wav_max_len > 0:
                 start_pos = random.randint(0, audio_i.shape[-1] - self.wav_max_len)
             else:
                 start_pos = 0

@@ -6,7 +6,7 @@ from src.utils.audio_utils import MelSpectrogramConfig
 
 
 class ResBlock(nn.Module):
-    def __init__(self, dilations, kernel, channels, relu_slope=0.1) -> None:
+    def __init__(self, dilations, kernel, channels, relu_slope=0.1, init_norm=True) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Sequential(*[
@@ -25,7 +25,7 @@ class ResBlock(nn.Module):
     
 
 class MultiReceptiveFieldFusion(nn.Module):
-    def __init__(self, dilations, kernels, channels, relu_slope=0.1) -> None:
+    def __init__(self, dilations, kernels, channels, relu_slope=0.1, init_norm=True) -> None:
         super().__init__()
         self.layers = nn.ModuleList((
             ResBlock(dilations[i], kernels[i], channels, relu_slope) for i in range(len(dilations))
@@ -36,12 +36,12 @@ class MultiReceptiveFieldFusion(nn.Module):
         for block_i in self.layers:
             output_i = block_i(x)
             result = result + output_i if result is not None else output_i
-        return result / len(self.layers)
+        return result 
 
 
 class Generator(nn.Module):
     def __init__(self, kernels_mrf, kernels_upsample, dilations, encoder_channels, 
-                 kernel_encoder=7, dilation_encoder=1, kernel_head=7, relu_slope=0.1):
+                 kernel_encoder=7, dilation_encoder=1, kernel_head=7, relu_slope=0.1, init_norm=True):
         super().__init__()
         self.encoder = WNormConv1d(MelSpectrogramConfig.n_mels, encoder_channels, 
                                    kernel_size=kernel_encoder, dilation=dilation_encoder, padding="same")

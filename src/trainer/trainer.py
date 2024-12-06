@@ -69,8 +69,6 @@ class Trainer(BaseTrainer):
         metric_funcs = self.metrics["inference"]
         if self.is_train:
             metric_funcs = self.metrics["train"]
-            self.model.mpd.train()
-            self.model.msd.train()
 
         generated_audios = self.model.generator(batch['mel_spec'])
         batch.update({'generated_audios': generated_audios})
@@ -94,8 +92,6 @@ class Trainer(BaseTrainer):
         # Generator loss
         if self.is_train:
             self.optimizer.generator_optimizer.zero_grad()
-            self.model.mpd.eval()
-            self.model.msd.eval()
         
         t = time.time_ns()
         generated_mels = self.mel_spectrogram_transformer(generated_audios)
