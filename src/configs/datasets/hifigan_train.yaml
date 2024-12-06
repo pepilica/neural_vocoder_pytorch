@@ -1,8 +1,8 @@
 train:
   _target_: src.datasets.LJSpeechDataset
   data_dir: "data/wavs"
-  audio_max_len: 8192
+  audio_max_len: 16384
 val:
   _target_: src.datasets.LJSpeechDataset
   data_dir: "data/val_wavs"
-  audio_max_len: 8192
+  audio_max_len: 16384

@@ -27,7 +27,7 @@ def collate_fn(dataset_items: list[dict]):
             batched_items[key] = pad_sequence(
                 [item[key].permute((1, 0)) if len(item[key].shape) > 1
                 else item[key] for item in dataset_items],
-                batch_first=True,
+                batch_first=True
             )
         else:
             batched_items[key] = [item[key] for item in dataset_items]

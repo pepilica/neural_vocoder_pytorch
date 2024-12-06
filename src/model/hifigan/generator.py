@@ -36,7 +36,7 @@ class MultiReceptiveFieldFusion(nn.Module):
         for block_i in self.layers:
             output_i = block_i(x)
             result = result + output_i if result is not None else output_i
-        return result
+        return result / len(self.layers)
 
 
 class Generator(nn.Module):
@@ -66,8 +66,8 @@ class Generator(nn.Module):
     def forward(self, mel_spec, **batch):
         spec_encoded = self.encoder(mel_spec)
         spec_upsampled = self.upsampling_layers(spec_encoded)
-        generated_audio = self.audio_head(spec_upsampled).flatten(1, 2)
-        return generated_audio
+        generated_audio = self.audio_head(spec_upsampled)
+        return generated_audio.flatten(1, 2)
     
     def __str__(self) -> str:
         """

@@ -1,4 +1,6 @@
 import math
+from itertools import chain
+import time
 
 from torch import nn
 from torch.nn import functional as F
@@ -8,14 +10,16 @@ from src.model.hifigan.layers import WNormConv1d, SNormConv1d
 class MSDDiscriminator(nn.Module):
     def __init__(self, pooling_factor, channels, kernels, strides, groups, relu_slope=0.1) -> None:
         super().__init__()
-        self.pooling_factor = pooling_factor
         if pooling_factor == 1:
             self.pooling = nn.Identity()
             conv_type = SNormConv1d
         else:
-            self.pooling = nn.Sequential(
-                *[nn.AvgPool1d(kernel_size=4, stride=2, padding=2) for _ in range(int(math.log2(pooling_factor)))]
-            )
+            cur_factor = pooling_factor
+            layers = []
+            while cur_factor > 1:
+                layers.append(nn.AvgPool1d(kernel_size=4, stride=2, padding=2))
+                cur_factor //= 2
+            self.pooling = nn.Sequential(*layers)
             conv_type = WNormConv1d
         channels = [1] + channels
         self.blocks = nn.ModuleList([
@@ -48,7 +52,7 @@ class MSDDiscriminator(nn.Module):
             x = layer(x)
             feature_maps.append(x)
         x = self.head(x)
-        return x, feature_maps
+        return x.flatten(1, -1), feature_maps
     
 
 class MSD(nn.Module):
@@ -76,7 +80,7 @@ class MSD(nn.Module):
         for base_discriminator in self.discriminators:
             output, features_list = base_discriminator(audio)
             outputs.append(output)
-            features.extend(features_list)
+            features.append(features_list)
         return outputs, features
 
     def __str__(self) -> str:

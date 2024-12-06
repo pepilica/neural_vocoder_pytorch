@@ -8,11 +8,11 @@ defaults:
   - _self_
 generator_optimizer: 
   _target_: torch.optim.AdamW
-  lr: 0.00005
+  lr: 0.00005  # OG lr divided by /sqrt{4} because of adamw scaling laws
   betas: [0.8, 0.99]
 discriminator_optimizer: 
   _target_: torch.optim.AdamW
-  lr: 0.0002
+  lr: 0.00005  # OG lr divided by /sqrt{4} because of adamw scaling laws
   betas: [0.8, 0.99]
 optimizer:
   _target_: src.model.hifigan.gan_optimizers.GANOptimizer
@@ -28,14 +28,17 @@ loss_function:
   _target_: src.loss.HiFiGANLoss
 trainer:
   log_step: 50
-  n_epochs: 100
-  epoch_len: 1000
+  n_epochs: 200
+  # epoch_len: 400
+  epoch_len: 200
   device_tensors: ["audio", "mel_spec"] # which tensors should be on device (ex. GPU)
-  resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
+  # resume_from: /home/pepilica/neural_vocoder_pytorch/weights/checkpoint-epoch19.pth # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
   override: True # if True, will override the previous run with the same name
   monitor: "min val_loss" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
+  # from_pretrained: /home/pepilica/neural_vocoder_pytorch/weights/checkpoint-epoch3.pth
+  use_speedup: True
   seed: 1

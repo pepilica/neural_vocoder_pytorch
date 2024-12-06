@@ -30,8 +30,7 @@ class BaseTrainer:
         writer,
         epoch_len=None,
         skip_oom=True,
-        batch_transforms=None,
-        use_speedup=False
+        batch_transforms=None
     ):
         """
         Args:
@@ -144,10 +143,6 @@ class BaseTrainer:
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
 
-        if use_speedup:
-            torch.backends.cudnn.deterministic = False
-            torch.backends.cudnn.benchmark = True 
-
     def train(self):
         """
         Wrapper around training process to save model on keyboard interrupt.
@@ -216,12 +211,12 @@ class BaseTrainer:
                     batch,
                     metrics=self.train_metrics,
                 )
-                gc.collect()
                 torch.cuda.empty_cache()
             except torch.cuda.OutOfMemoryError as e:
                 if self.skip_oom:
                     self.logger.warning("OOM on batch. Skipping batch.")
                     torch.cuda.empty_cache()  # free some memory
+                    gc.collect()
                     continue
                 else:
                     raise e

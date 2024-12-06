@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch.nn.functional import l1_loss
 
+import time
+
 
 class GANLossDiscriminator(nn.Module):
     def __init__(self) -> None:
@@ -21,8 +23,8 @@ class GANLossGenerator(nn.Module):
 
     def forward(self, probs_generated, **kwargs):
         result_loss = 0
-        for loss_i in map(lambda a: torch.mean((a - 1) ** 2), probs_generated):
-            result_loss = result_loss + loss_i
+        for output_i in probs_generated:
+            result_loss = result_loss + torch.mean((output_i - 1) ** 2)
         return result_loss
 
 
@@ -40,8 +42,9 @@ class FeatureMatchingLoss(nn.Module):
 
     def forward(self, features_gt, features_generated, **kwargs):
         result_loss = 0
-        for loss_i in map(lambda x: l1_loss(x[0], x[1]), zip(features_gt, features_generated)):
-            result_loss = result_loss + loss_i
+        for gt_i, generated_i in zip(features_gt, features_generated):
+            for gt_ij, generated_ij in zip(gt_i, generated_i):
+                result_loss += l1_loss(generated_ij, gt_ij)
         return result_loss
     
 

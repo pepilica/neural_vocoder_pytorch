@@ -40,14 +40,14 @@ class MPDDiscriminator(nn.Module):
         if (s := x.shape[-1] % self.period) != 0:
             x = F.pad(x, (0, self.period - s), mode="reflect")
         B, S = x.shape
-        x = x.reshape((B, 1, self.period, S // self.period)).contiguous()
+        x = x.reshape((B, 1, S // self.period, self.period)).contiguous()
 
         feature_maps = []
         for layer in self.blocks:
             x = layer(x)
             feature_maps.append(x)
         x = self.last_layer(x)
-        return x.flatten(-1, -1), feature_maps
+        return x.flatten(1, -1), feature_maps
 
 
 class MPD(nn.Module):
@@ -74,7 +74,7 @@ class MPD(nn.Module):
         for base_discriminator in self.discriminators:
             output, features_list = base_discriminator(audio)
             outputs.append(output)
-            features.extend(features_list)
+            features.append(features_list)
         return outputs, features
 
     def __str__(self) -> str:

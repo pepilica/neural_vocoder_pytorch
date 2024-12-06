@@ -1,5 +1,6 @@
 torch
 torchvision
+torchaudio
 torchmetrics
 numpy==2.0
 tqdm
@@ -8,6 +9,7 @@ pandas
 wandb
 comet_ml
 hydra-core
+librosa
 
 black
 isort
