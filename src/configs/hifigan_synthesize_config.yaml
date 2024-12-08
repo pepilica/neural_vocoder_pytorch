@@ -1,0 +1,14 @@
+defaults:
+  - model: hifigan
+  - writer: wandb
+  - metrics: hifigan
+  - datasets: hifigan_test
+  - dataloader: inference
+  - transforms: hifigan_synthesize
+  - _self_
+inferencer:
+  device_tensors: ["mel_spec"] # which tensors should be on device (ex. GPU)
+  device: auto # device name or "auto"
+  save_path: "result" # any name here, can be a dataset name
+  seed: 1
+  from_pretrained: "saved/model_best.pth" # path to the pretrained model

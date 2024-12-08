@@ -33,5 +33,6 @@ def collate_fn(dataset_items: list[dict]):
         else:
             batched_items[key] = [item[key] for item in dataset_items]
     batched_items["mel_spec"] = batched_items["mel_spec"].permute((0, 2, 1))
-    batched_items["audio"] = batched_items["audio"].squeeze(-1)
+    if batched_items.get('audio', None) is not None:
+        batched_items["audio"] = batched_items["audio"].squeeze(-1)
     return batched_items

@@ -108,6 +108,8 @@ wandb/
 .cometml-runs/
 outputs/
 weights/
+pretrained_models/
+result_text/
 
 # editor, os cache directory
 .vscode/

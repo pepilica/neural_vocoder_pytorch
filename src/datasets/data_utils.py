@@ -43,7 +43,7 @@ def move_batch_transforms_to_device(batch_transforms, device):
                 transforms[transform_name] = transforms[transform_name].to(device)
 
 
-def get_dataloaders(config, device):
+def get_dataloaders(config, device, transcription_dir=None, audio_dir=None):
     """
     Create dataloaders for each of the dataset partitions.
     Also creates instance and batch transforms.
@@ -61,9 +61,16 @@ def get_dataloaders(config, device):
     # transforms or augmentations init
     batch_transforms = instantiate(config.transforms.batch_transforms)
     move_batch_transforms_to_device(batch_transforms, device)
+    instance_transforms = instantiate(config.transforms.instance_transforms)
+    move_batch_transforms_to_device(instance_transforms, device)
 
     # dataset partitions init
-    datasets = instantiate(config.datasets)  # instance transforms are defined inside
+    if transcription_dir is not None:
+        datasets = instantiate(config.datasets, transcription_dir=transcription_dir)
+    elif audio_dir is not None:
+        datasets = instantiate(config.datasets, audio_dir=audio_dir)
+    else:
+        datasets = instantiate(config.datasets)  # instance transforms are defined inside
 
     # dataloaders init
     dataloaders = {}
@@ -85,4 +92,4 @@ def get_dataloaders(config, device):
         )
         dataloaders[dataset_partition] = partition_dataloader
 
-    return dataloaders, batch_transforms
+    return dataloaders, batch_transforms, instance_transforms

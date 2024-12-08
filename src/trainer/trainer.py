@@ -151,12 +151,16 @@ class Trainer(BaseTrainer):
         if mode == "train":  # the method is called only every self.log_step steps
             self.log_spectrogram(batch['spec_generated'], name='Generated_Spectrogram')
             self.log_spectrogram(batch['mel_spec'], name='Ground_truth_Spectrogram')
+            self.log_spectrogram(torch.abs(batch['spec_generated'] - batch['mel_spec']), 
+                                 name='Absolute differencies for GT and generated mel-spectrograms')
             self.log_audio(**batch)
         else:
             # Log Stuff
             # TODO: MOS evaluation via estimator
             self.log_spectrogram(batch['spec_generated'], name='Generated_Spectrogram')
             self.log_spectrogram(batch['mel_spec'], name='Ground_truth_Spectrogram')
+            self.log_spectrogram(torch.abs(batch['spec_generated'] - batch['mel_spec']), 
+                                 name='Absolute differencies for GT and generated mel-spectrograms')
             self.log_audio(**batch)
 
     def log_audio(self, audio_path, examples_to_log=10, **batch):

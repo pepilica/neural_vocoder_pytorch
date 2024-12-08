@@ -10,6 +10,8 @@ wandb
 comet_ml
 hydra-core
 librosa
+git+https://github.com/AndreevP/wvmos
+speechbrain
 
 black
 isort
