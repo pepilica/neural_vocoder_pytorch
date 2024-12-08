@@ -27,7 +27,8 @@ class Trainer(BaseTrainer):
                  writer, 
                  epoch_len=None, 
                  skip_oom=True, 
-                 batch_transforms=None):
+                 batch_transforms=None,
+                 instance_transforms=None):
         super().__init__(model, criterion, metrics, optimizer, lr_scheduler, config, device, 
                          dataloaders, logger, writer, epoch_len, skip_oom, batch_transforms)
         mel_spectrogram_config = MelSpectrogramConfig()

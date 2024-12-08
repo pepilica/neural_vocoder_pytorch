@@ -12,6 +12,8 @@ hydra-core
 librosa
 git+https://github.com/AndreevP/wvmos
 speechbrain
+gdown
+wget
 
 black
 isort

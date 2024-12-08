@@ -27,10 +27,10 @@ lr_scheduler:
 loss_function:
   _target_: src.loss.HiFiGANLoss
 trainer:
-  log_step: 50
+  log_step: 1
   n_epochs: 100
   # epoch_len: 400
-  epoch_len: 250
+  epoch_len: 5
   device_tensors: ["audio", "mel_spec"] # which tensors should be on device (ex. GPU)
   # resume_from: /home/pepilica/neural_vocoder_pytorch/weights/checkpoint-epoch19.pth # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
