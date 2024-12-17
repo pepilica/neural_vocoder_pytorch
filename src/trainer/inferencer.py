@@ -4,6 +4,7 @@ from tqdm.auto import tqdm
 
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
+from src.utils.io_utils import ROOT_PATH
 
 
 class Inferencer(BaseTrainer):
@@ -84,7 +85,7 @@ class Inferencer(BaseTrainer):
 
         if not skip_model_load:
             # init model
-            self._from_pretrained(config.inferencer.get("from_pretrained"))
+            self._from_pretrained(str(ROOT_PATH / config.inferencer.get("from_pretrained")))
 
     def run_inference(self):
         """
@@ -94,7 +95,6 @@ class Inferencer(BaseTrainer):
             part_logs (dict): part_logs[part_name] contains logs
                 for the part_name partition.
         """
-        print("!")
         part_logs = {}
         for part, dataloader in self.evaluation_dataloaders.items():
             logs = self._inference_part(part, dataloader)
@@ -129,10 +129,6 @@ class Inferencer(BaseTrainer):
         outputs = self.model.generator(**batch)
         batch['output_audio'] = outputs
 
-        if metrics is not None:
-            for met in self.metrics["inference"]:
-                metrics.update(met.name, met(**batch))
-
         # Some saving logic. This is an example
         # Use if you need to save predictions on disk
 
@@ -147,7 +143,7 @@ class Inferencer(BaseTrainer):
             if self.save_path is not None:
                 # you can use safetensors or other lib here
                 torchaudio.save(
-                    self.save_path / f"{output_id[0]}.wav",
+                    str(self.save_path / f"{output_id[0]}.wav"),
                     output_audio,
                     sample_rate=self.model_sample_rate,
                 )
@@ -173,7 +169,6 @@ class Inferencer(BaseTrainer):
         # create Save dir
         if self.save_path is not None:
             (self.save_path / part).mkdir(exist_ok=True, parents=True)
-
         with torch.no_grad():
             for batch_idx, batch in tqdm(
                 enumerate(dataloader),
@@ -186,5 +181,8 @@ class Inferencer(BaseTrainer):
                     part=part,
                     metrics=self.evaluation_metrics,
                 )
+            if self.evaluation_metrics is not None:
+                for met in self.metrics["inference"]:
+                    self.evaluation_metrics.update(met.name, met(**batch))
 
         return self.evaluation_metrics.result()

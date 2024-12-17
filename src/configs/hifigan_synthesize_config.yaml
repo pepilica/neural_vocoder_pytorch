@@ -1,7 +1,7 @@
 defaults:
   - model: hifigan
   - writer: wandb
-  - metrics: hifigan
+  - metrics: hifigan_inference
   - datasets: hifigan_test
   - dataloader: inference
   - transforms: hifigan_synthesize

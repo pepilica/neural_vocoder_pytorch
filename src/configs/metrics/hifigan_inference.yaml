@@ -1,0 +1,5 @@
+train: []
+inference:
+  - _target_: src.metrics.WVMOSMetric
+    name: "mos_estimate"
+    audio_paths: null

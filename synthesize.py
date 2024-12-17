@@ -34,18 +34,19 @@ def main(config):
     # batch_transforms should be put on device
     dataloaders, batch_transforms, instance_transforms = get_dataloaders(config, device, 
                                                                          transcription_dir=config.datasets.test.transcription_dir,
-                                                                         audio_dir=config.datasets.test.audio_dir)
+                                                                         audio_dir=config.datasets.test.audio_dir,
+                                                                         query=config.datasets.test.query)
 
     # build model architecture, then print to console
     model = instantiate(config.model).to(device)
     print(model)
 
-    # get metrics
-    metrics = instantiate(config.metrics)
-
     # save_path for model predictions
     save_path = ROOT_PATH / config.inferencer.save_path
     save_path.mkdir(exist_ok=True, parents=True)
+
+    # get metrics
+    metrics = instantiate(config.metrics, audio_paths=save_path)
 
     inferencer = Inferencer(
         model=model,

@@ -122,7 +122,6 @@ class BaseDataset(Dataset):
         Returns:
             spectrogram (Tensor): spectrogram for the source.
         """
-        print(self.instance_transforms)
         return self.instance_transforms["get_spectrogram"](source)
 
     def preprocess_data(self, instance_data):

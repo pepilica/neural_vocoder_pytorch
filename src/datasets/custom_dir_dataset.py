@@ -17,6 +17,7 @@ class CustomDirDataset(BaseDataset):
 
         if query is not None:
             data.append({"id": "my_query", "text": query})
+            super().__init__(data, *args, **kwargs)
             return
         
         if transcription_dir is not None:
@@ -58,7 +59,7 @@ class CustomDirDataset(BaseDataset):
             mel_spec = self.get_spectrogram(audio)
         if 'text' in entry.keys():
             instance_data['text'] = entry['text']
-            instance_data['text_path'] = entry['text_path']
+            instance_data['text_path'] = entry.get('text_path', None)
             mel_spec = self.get_spectrogram(entry['text'])
         instance_data['mel_spec'] = mel_spec
         return instance_data

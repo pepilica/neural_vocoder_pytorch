@@ -52,6 +52,12 @@ Follow these steps to install the project:
    pre-commit install
    ```
 
+3. Download the final model's weights by running the script:
+
+   ```bash
+   python download_weights.py
+   ```
+
 ## Training
 
 The model was trained in 2 steps. To reproduce, train model using the following commands:
@@ -73,20 +79,19 @@ The model was trained in 2 steps. To reproduce, train model using the following 
    1. If you want only to decode text to speech, your directory with text should has the following format:
       ```bash
       NameOfTheDirectoryWithUtterances
-      └── transcriptions
-         ├── UtteranceID1.txt
-         ├── UtteranceID2.txt
-         .
-         .
-         .
-         └── UtteranceIDn.txt
+      ├── UtteranceID1.txt
+      ├── UtteranceID2.txt
+      .
+      .
+      .
+      └── UtteranceIDn.txt
       ```
 
       Run the following command:
       ```bash
-      python synthesize.py ++datasets.test.audio_dir=AUDIO_DIR ++inferencer.save_path=SAVE_PATH
+      python synthesize.py -cn=hifigan_synthesize_config ++datasets.test.transcription_dir=TRANSCRIPTION_DIR ++inferencer.save_path=SAVE_PATH
       ```
-      where `SAVE_PATH` is a path to save predicted text and `AUDIO_DIR` is directory with audio.
+      where `SAVE_PATH` is a path to save predicted audio and `TRANSCRIPTION_DIR` is directory with texts.
    2. If you have ground truth audio and want to generate vocoded audios, make sure that directory with audio has the following format:
       ```
       NameOfTheDirectoryWithUtterances
@@ -99,7 +104,15 @@ The model was trained in 2 steps. To reproduce, train model using the following 
       ```
       Then run the following command:
       ```bash
-      python synthesize.py ++datasets.test.audio_dir=AUDIO_DIR ++inferencer.save_path=SAVE_PATH  -cn=hifigan_inference_config
+      python synthesize.py -cn=hifigan_inference_config ++datasets.test.audio_dir=AUDIO_DIR ++inferencer.save_path=SAVE_PATH
+      ```
+      where `SAVE_PATH` is a path to save predicted audio and `AUDIO_DIR` is directory with GT audio.
+
+   3. If you want to use the TTS pipeline for a specific query, then run:
+      ```bash
+      python synthesize.py -cn=hifigan_synthesize_config '++datasets.test.query="QUERY"' ++inferencer.save_path=SAVE_PATH
+      ```
+      where `SAVE_PATH` is a path to save predicted audio and `QUERY` is text requested to be transformed to speech.
 
 ## Credits
 
